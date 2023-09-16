@@ -1,10 +1,10 @@
-from fastapi import FastAPI, Depends, status, HTTPException
+from fastapi import FastAPI, Request, Depends, status, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from sqlalchemy.orm import Session
 
 from server.database import get_db
-from server.schemas.response import HealthResponse, UserRequest
+from server.schemas.misc import AmountRequest, HealthResponse, TransferRequest, UserRequest
 from server.models.user import User, UserAccount
 from server.utils.auth import generate_jwt, decode_jwt, path_dict
 
@@ -44,30 +44,24 @@ class AuthMiddleware:
                 if not user_id:
                     raise HTTPException(
                         status_code=status.HTTP_401_UNAUTHORIZED,
-                        detail="Invalid access token."
+                        detail='Invalid access token'
                     )
 
-                # Attach the "user_id" to the scope for the API to access
                 scope['user_id'] = user_id
                 await self.app(scope, receive, send)
                 return
             except HTTPException as e:
+                print(f'{str(e)}\n{traceback.format_exc()}')
                 raise e
             except Exception as e:
-                print('yoyoyo')
                 print(f'{str(e)}\n{traceback.format_exc()}')
 
-                status_code = e.get(
-                    'status_code', status.HTTP_500_INTERNAL_SERVER_ERROR)
-                detail = e.get('detail', 'Error while validating access toekn')
-
                 raise HTTPException(
-                    status_code=status_code,
-                    detail=detail
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail='Error while validating access token'
                 )
 
 
-app.add_middleware(AuthMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -78,6 +72,7 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
+app.add_middleware(AuthMiddleware)
 
 
 @app.get("/", status_code=status.HTTP_200_OK, tags=["Health check"])
@@ -93,86 +88,83 @@ async def register(user: UserRequest, db: Session = Depends(get_db)):
     '''
     Register user and create user account
     '''
-    try:
-        db_user = User(**user.dict())
-        db.add(db_user)
-        db.commit()
-        db.refresh(db_user)
+    user = user.model_dump()
 
-        user_account = UserAccount()
-        user_account.user_id = db_user.id
-        db.add(user_account)
-        db.commit()
-        db.refresh(user_account)
+    existing_user = db.query(User).filter(
+        User.username == user.get('username', '')).first()
 
-        return {
-            'user': db_user,
-            'account': user_account
-        }
-    except Exception as e:
-        print(f'{str(e)}\n{traceback.format_exc()}')
-
+    if existing_user:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error while creating user."
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="username already exists."
         )
 
+    db_user = User(**user)
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
 
-@app.get("/auth", status_code=status.HTTP_200_OK, tags=["Auth"])
+    user_account = UserAccount()
+    user_account.user_id = db_user.id
+    db.add(user_account)
+    db.commit()
+    db.refresh(user_account)
+
+    return {
+        'id': db_user.id,
+        'username': db_user.username,
+        'account':  {
+            'balance': user_account.balance,
+            'last_updated': user_account.updated_at
+        }
+    }
+
+
+@app.post("/auth", status_code=status.HTTP_200_OK, tags=["Auth"])
 async def authenticate(user: UserRequest, db: Session = Depends(get_db)):
     '''
     Authenticate user and generate access token
     '''
-    try:
-        db_user = db.query(User).filter(User.username == user.username).first()
+    db_user = db.query(User).filter(User.username == user.username).first()
 
-        if db_user and db_user.password == user.password:
-            access_token = generate_jwt({'user_id': db_user.id})
+    if db_user and db_user.password == user.password:
+        access_token = generate_jwt({'user_id': db_user.id})
 
-            return {"access_token": access_token}
+        return {"access_token": access_token}
 
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
-                            detail="Invalid username or password.")
-    except Exception as e:
-        print(f'{str(e)}\n{traceback.format_exc()}')
-
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error while authenticating user."
-        )
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail='Invalid username or password.'
+    )
 
 
-@app.get("/user/balance", status_code=status.HTTP_200_OK, tags=["User"])
-async def get_account_balance(user_id: int, db: Session = Depends(get_db)):
+@app.get("/user/balance/", status_code=status.HTTP_200_OK, tags=["User"])
+async def get_account_balance(request: Request, db: Session = Depends(get_db)):
     '''
     Get user account balance
     '''
-    try:
-        account = db.query(UserAccount).filter(
-            UserAccount.user_id == user_id).first()
+    user_id = request.scope.get('user_id')
+    account = db.query(UserAccount).filter(
+        UserAccount.user_id == user_id).first()
 
-        if account:
-            return {"balance": account.balance}
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Account not found."
-            )
-    except Exception as e:
-        print(f'{str(e)}\n{traceback.format_exc()}')
-
+    if not account:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error while getting user balance."
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Account not found."
         )
+
+    return {"balance": account.balance}
 
 
 @app.patch("/user/deposit", status_code=status.HTTP_200_OK, tags=["User"])
-async def deposit(user_id: int, amount: float, db: Session = Depends(get_db)):
+async def deposit(request: Request, amount: AmountRequest, db: Session = Depends(get_db)):
     '''
     Deposit amount in user account
     '''
     try:
+        user_id = request.scope.get('user_id')
+        deposit_value = int(amount.value) or 0
+
         with db.begin() as transaction:
             account = db.query(UserAccount).filter(
                 UserAccount.user_id == user_id).with_for_update().first()
@@ -183,26 +175,23 @@ async def deposit(user_id: int, amount: float, db: Session = Depends(get_db)):
                     detail="Account not found"
                 )
 
-            account.balance += amount
-            transaction.commit()
+            account.balance += deposit_value
 
-            return {'message': f"${amount} deposited successfully."}
-    except Exception as e:
-        transaction.rollback()
-        print(f'{str(e)}\n{traceback.format_exc()}')
-
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error while depositing amount in user account."
-        )
+            return {'message': f"{deposit_value}₹ deposited successfully."}
+    except Exception as error:
+        print(f'{str(error)}\n{traceback.format_exc()}')
+        raise error
 
 
 @app.patch("/user/withdraw", status_code=status.HTTP_200_OK, tags=["User"])
-async def withdraw(user_id: int, amount: float, db: Session = Depends(get_db)):
+async def withdraw(request: Request, amount: AmountRequest, db: Session = Depends(get_db)):
     '''
     Withdraw amount from user account
     '''
     try:
+        user_id = request.scope.get('user_id')
+        withdraw_value = int(amount.value) or 0
+
         with db.begin() as transaction:
             account = db.query(UserAccount).filter(
                 UserAccount.user_id == user_id).with_for_update().first()
@@ -213,42 +202,40 @@ async def withdraw(user_id: int, amount: float, db: Session = Depends(get_db)):
                     detail="Account not found"
                 )
 
-            if account.balance < amount:
+            if account.balance < withdraw_value:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Insufficient balance"
                 )
 
-            account.balance -= amount
-            transaction.commit()
+            account.balance -= withdraw_value
 
-            return {'message': f"${amount} withdrawn successfully."}
-    except Exception as e:
-        transaction.rollback()
-        print(f'{str(e)}\n{traceback.format_exc()}')
-
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error while withdrawing amount from user account."
-        )
+            return {'message': f"{withdraw_value}₹ withdrawn successfully."}
+    except Exception as error:
+        print(f'{str(error)}\n{traceback.format_exc()}')
+        raise error
 
 
 @app.patch("/user/transfer", status_code=status.HTTP_200_OK, tags=["User"])
-async def transfer_amount(user_id: int, to_user: int, amount: float, db: Session = Depends(get_db)):
+async def transfer_amount(request: Request, transfer_to: TransferRequest, db: Session = Depends(get_db)):
     '''
     Transfer amount to given user account
     '''
     try:
+        sender_user_id = request.scope.get('user_id')
+        receiver_user_id = int(transfer_to.user_id) or 0
+        transfer_amount = int(transfer_to.amount) or 0
+
         with db.begin() as transaction:
             sender_account = (
                 db.query(UserAccount)
-                .filter(UserAccount.user_id == user_id)
+                .filter(UserAccount.user_id == sender_user_id)
                 .with_for_update()
                 .first()
             )
             receiver_account = (
                 db.query(UserAccount)
-                .filter(UserAccount.user_id == to_user)
+                .filter(UserAccount.user_id == receiver_user_id)
                 .with_for_update()
                 .first()
             )
@@ -256,25 +243,20 @@ async def transfer_amount(user_id: int, to_user: int, amount: float, db: Session
             if not sender_account or not receiver_account:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Account not found"
+                    detail='Account not found'
                 )
 
-            if sender_account.balance < amount:
+            if sender_account.balance < transfer_amount:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Insufficient balance"
                 )
 
-            sender_account.balance -= amount
-            receiver_account.balance += amount
+            sender_account.balance -= transfer_amount
+            receiver_account.balance += transfer_amount
             transaction.commit()
 
-        return {'message': f"{amount} transfered successfully."}
-    except Exception as e:
-        transaction.rollback()
-        print(f'{str(e)}\n{traceback.format_exc()}')
-
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error while transfering amount to user account."
-        )
+        return {'message': f"{transfer_amount}₹ transferred successfully."}
+    except Exception as error:
+        print(f'{str(error)}\n{traceback.format_exc()}')
+        raise error
