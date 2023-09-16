@@ -1,0 +1,31 @@
+version: "3"
+
+services:
+    postgreshost:
+        image: 'postgres:16-alpine'
+        volumes:
+            - postgres_data:/var/lib/postgresql/data/
+        ports:
+            - "5432:5432"
+        environment:
+            - POSTGRES_USER=postgres
+            - POSTGRES_PASSWORD=Welcome!
+            - POSTGRES_DB=user
+
+    app:
+        build:
+            context: .
+            dockerfile: Dockerfile.app
+        environment:
+            - POSTGRES_USER=postgres
+            - POSTGRES_PASSWORD=Welcome!
+            - POSTGRES_HOST=postgreshost
+            - POSTGRES_DB=user
+            - PGPORT=5432
+        ports:
+            - "8000:8000"
+        depends_on:
+            - postgreshost
+
+volumes:
+    postgres_data:
