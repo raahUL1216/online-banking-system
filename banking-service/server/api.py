@@ -69,7 +69,7 @@ app.add_middleware(
         "http://localhost:3000"
     ],
     allow_credentials=True,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "PATCH"],
     allow_headers=["*"],
 )
 app.add_middleware(AuthMiddleware)

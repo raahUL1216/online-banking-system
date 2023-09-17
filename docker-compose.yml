@@ -1,0 +1,70 @@
+version: "3"
+
+services:
+    postgreshost:
+        image: 'postgres:16-alpine'
+        volumes:
+            - postgres_data:/var/lib/postgresql/data/
+        ports:
+            - "5432:5432"
+        environment:
+            - POSTGRES_USER=postgres
+            - POSTGRES_PASSWORD=Welcome!
+            - POSTGRES_DB=user
+
+    rabbitmqhost:
+        image: rabbitmq:latest
+        ports:
+         - "5672:5672"
+
+    banking-service:
+        build:
+            context: ./banking-service
+            dockerfile: Dockerfile.app
+        environment:
+            - POSTGRES_USER=postgres
+            - POSTGRES_PASSWORD=Welcome!
+            - POSTGRES_HOST=postgreshost
+            - POSTGRES_DB=user
+        ports:
+            - "8000:8000"
+        depends_on:
+            - postgreshost
+
+    statement-generation-service:
+        build:
+            context: ./statement-generation-service
+            dockerfile: Dockerfile.app
+        environment:
+            - POSTGRES_USER=postgres
+            - POSTGRES_PASSWORD=Welcome!
+            - POSTGRES_HOST=postgreshost
+            - POSTGRES_DB=user
+        ports:
+            - "8001:8001"
+        depends_on:
+            - postgreshost
+
+    statement-scheduler:
+        build:
+            context: ./schedulers/monthly-statement
+        depends_on:
+            - rabbitmq
+            - postgreshost
+        environment:
+            - POSTGRES_USER=postgres
+            - POSTGRES_PASSWORD=Welcome!
+            - POSTGRES_HOST=postgreshost
+            - POSTGRES_DB=user
+            - CELERY_BROKER_URL=pyamqp://guest@rabbitmqhost:5672//
+        command:
+            [
+                "celery",
+                "-A",
+                "app.celery",
+                "worker",
+                "--loglevel=info"
+            ]
+
+volumes:
+    postgres_data:
