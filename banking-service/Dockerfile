@@ -2,18 +2,16 @@
 FROM python:3.10
 
 # Prevents Python from writing pyc files to disc
-# ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONDONTWRITEBYTECODE 1
 # Prevents Python from buffering stdout and stderr
 ENV PYTHONUNBUFFERED 1
 
-# Create a working directory inside the container
+# Create a working directory
 WORKDIR /app
+COPY requirements.txt /app/
 
-# Copy Pipfile and Pipfile.lock into the container's working directory
-COPY Pipfile Pipfile.lock /app/
-
-# Install pipenv and project dependencies
-RUN pip install pipenv && pipenv install --deploy --ignore-pipfile
+# Install project dependencies
+RUN pip install --no-cache-dir --upgrade -r /app/requirements.txt
 
 # Copy the rest of your application code into the container
 COPY . /app/
@@ -22,4 +20,4 @@ COPY . /app/
 EXPOSE 8000
 
 # Specify the command to run your application
-CMD ["pipenv", "run", "python", "main.py"]
+CMD ["python", "main.py"]

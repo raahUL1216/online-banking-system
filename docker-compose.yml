@@ -14,13 +14,16 @@ services:
 
     rabbitmqhost:
         image: rabbitmq:latest
+        environment:
+            - RABBITMQ_DEFAULT_USER=guest
+            - RABBITMQ_DEFAULT_PASS=guest
         ports:
-         - "5672:5672"
+            - "5672:5672"
 
     banking-service:
         build:
             context: ./banking-service
-            dockerfile: Dockerfile.app
+            dockerfile: ./Dockerfile
         environment:
             - POSTGRES_USER=postgres
             - POSTGRES_PASSWORD=Welcome!
@@ -34,7 +37,7 @@ services:
     statement-generation-service:
         build:
             context: ./statement-generation-service
-            dockerfile: Dockerfile.app
+            dockerfile: ./Dockerfile
         environment:
             - POSTGRES_USER=postgres
             - POSTGRES_PASSWORD=Welcome!
@@ -45,11 +48,13 @@ services:
         depends_on:
             - postgreshost
 
-    statement-scheduler:
-        build:
-            context: ./schedulers/monthly-statement
+    statement-worker:
+        build: ./monthly_statements
+        command: celery -A celery worker -l info
+        volumes:
+            - ./monthly_statements:/app
         depends_on:
-            - rabbitmq
+            - rabbitmqhost
             - postgreshost
         environment:
             - POSTGRES_USER=postgres
@@ -57,14 +62,21 @@ services:
             - POSTGRES_HOST=postgreshost
             - POSTGRES_DB=user
             - CELERY_BROKER_URL=pyamqp://guest@rabbitmqhost:5672//
-        command:
-            [
-                "celery",
-                "-A",
-                "app.celery",
-                "worker",
-                "--loglevel=info"
-            ]
+
+    statement-scheduler:
+        build: ./monthly_statements
+        command: celery -A celery beat -l info
+        volumes:
+            - ./monthly_statements:/app
+        depends_on:
+            - rabbitmqhost
+            - postgreshost
+        environment:
+            - POSTGRES_USER=postgres
+            - POSTGRES_PASSWORD=Welcome!
+            - POSTGRES_HOST=postgreshost
+            - POSTGRES_DB=user
+            - CELERY_BROKER_URL=pyamqp://guest@rabbitmqhost:5672//
 
 volumes:
     postgres_data:

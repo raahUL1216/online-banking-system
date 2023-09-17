@@ -41,6 +41,7 @@ async def register(user_id: int, month: int, year: int, db: Session = Depends(ge
     '''
     Generate and save monthly statement for user
     '''
+    print('yoyoyo')
     user_id = int(user_id) or 0
     month = int(month) or 0
     year = int(year) or 0
