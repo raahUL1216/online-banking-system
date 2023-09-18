@@ -58,3 +58,5 @@ async def register(user_id: int, month: int, year: int, db: Session = Depends(ge
     monthly_statement = MonthlyStatement(**statement)
     db.add(monthly_statement)
     db.commit()
+
+    return {'message': f'monthly statement generated successfully for user {user_id}'}

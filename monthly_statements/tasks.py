@@ -16,7 +16,7 @@ def generate_monthly_statements():
     users = db.query(User).all()
     
     today = datetime.now()
-    previous_month = (today.replace(day=1) - timedelta(days=1)).strftime('%B')
+    previous_month = (today.replace(day=1) - timedelta(days=1)).month
     current_year = today.strftime('%Y')
 
     for user in users:

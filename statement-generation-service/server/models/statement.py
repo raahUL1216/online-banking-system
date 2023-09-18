@@ -10,12 +10,15 @@ class User(Base):
     password = Column(String, nullable=False)
     created_at = Column(DateTime(timezone=False), server_default=func.now())
 
+
+# composite primary key will be (user_id, month, year), but removed it as scheduler runs 10sec periodically for demonstration purpose (will give unique constraint error if this primary key is specified). 
 class MonthlyStatement(Base):
     __tablename__ = "statements"
 
-    user_id = Column(BigInteger, ForeignKey('users.id'), primary_key=True)
-    month = Column(Integer, nullable=False, primary_key=True)
-    year = Column(Integer, nullable=False, primary_key=True)
+    id = Column(BigInteger, primary_key=True, autoincrement='auto')
+    user_id = Column(BigInteger, ForeignKey('users.id'))
+    month = Column(Integer, nullable=False)
+    year = Column(Integer, nullable=False)
     statement = Column(JSON, nullable=False)
     created_at = Column(DateTime(timezone=False), server_default=func.now())
 
