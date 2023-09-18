@@ -13,7 +13,7 @@ Statement Generation Service http://127.0.0.1:8001
 
 ### Postman collection
 [Banking service](/Banking%20APIs.postman_collection.json)
-Get authorization token from authentication API and update in postman collection to access user specific APIs 
+Get authorization token from authentication API and update in postman collection to access user specific APIs.
 
 ### Monthly statement scheduler
 Notes:
