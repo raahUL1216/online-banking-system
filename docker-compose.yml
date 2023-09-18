@@ -50,7 +50,7 @@ services:
 
     statement-worker:
         build: ./monthly_statements
-        command: celery -A celery worker -l info
+        command: celery -A celery worker -l debug
         volumes:
             - ./monthly_statements:/app
         depends_on:
@@ -65,7 +65,7 @@ services:
 
     statement-scheduler:
         build: ./monthly_statements
-        command: celery -A celery beat -l info
+        command: celery -A celery beat -l debug
         volumes:
             - ./monthly_statements:/app
         depends_on:
