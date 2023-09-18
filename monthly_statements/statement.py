@@ -12,7 +12,6 @@ def generate_monthly_statement(user_id: int, month: int, year: int) -> None:
         response = requests.post(url)
         response.raise_for_status()
 
-        print(response.text)
         if response.status_code == 201:
             body = response.json()
             print(body)

@@ -56,6 +56,7 @@ services:
         depends_on:
             - rabbitmqhost
             - postgreshost
+            - statement-generation-service
         environment:
             - POSTGRES_USER=postgres
             - POSTGRES_PASSWORD=Welcome!

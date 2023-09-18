@@ -12,45 +12,45 @@ Before you begin, ensure that you have the following installed on your system:
 ## Dockerization Steps
 
 1. **Create Dockerfile**:
-   - Create a `Dockerfile.app` in the root of your project directory.
+   - Create a `Dockerfile` for each service (or app) in your project.
+
+   Example:
    - Use an official Python 3.10 image as the base image.
    - Specify the working directory (`WORKDIR`) inside the container.
-   - Copy `Pipfile` and `Pipfile.lock` into the container's working directory.
-   - Install `pipenv` and project dependencies using the following commands:
+   - Copy `requirements.txt` into the container's working directory. So, dependency installation step can be cached with docker.
+   - Install dependencies:
      ```bash
-     RUN pip install pipenv
-     RUN pipenv install --deploy --ignore-pipfile
+     RUN pip install --no-cache-dir --upgrade -r /app/requirements.txt
      ```
    - Copy the rest of your application code into the container.
-   - Expose port 8000 (or the port your banking service listens on).
+   - Expose port 8000 (or the port your service listens on).
    - Specify the command to run your application:
      ```bash
-     CMD ["pipenv", "run", "python", "main.py"]
+     CMD ["python", "main.py"]
      ```
 
 2. **Create Docker Compose File**:
    - If application depends on other services (e.g., databases), create a `docker-compose.yml` file to define every application with their environment
-   - Configure services, networks, volumes, and environment variables in the docker-compose file.
+   - Configure services, dependencies, volumes, and environment variables in the docker-compose file.
 
-3. **Build the Docker Image**:
-   - Open a terminal in the project directory.
+3. **Build and Run the Docker Image**:
+   - Open a terminal in the root directory (docker-compose.yaml location).
    - Run the following command to build the Docker image:
      ```bash
-     docker-compose build
-     ```
+     docker-compose up --build -d
+     # -d stands for detached mode so container will run in background
 
-4. **Run the Docker Container**:
-   - To run your application in a Docker container, use the following command:
-     ```bash
+     #Seperate command
+     docker-compose build
      docker-compose up
      ```
-   - Replace `8000:8000` with the desired port mapping.
 
-5. **Access Your Application**:
-   - Once the container is running, your application should be accessible in your web browser at `http://localhost:8000` (or the specified port).
+4. **Access Your Application**:
+   - Once the container is running, verify that application is accessible, 
+      - Check healthcheck endpoint for services.
+      - Check container logs for scheduler
 
-6. **Cleanup**:
-   - To stop and remove the container, press `Ctrl+C` in the terminal where the container is running.
+5. **Cleanup**:
    - To remove the Docker image, use the following command:
      ```bash
      docker-compose down
