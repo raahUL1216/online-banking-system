@@ -18,7 +18,6 @@ Statement Generation Service http://127.0.0.1:8001
 Notes:
 - Create user(s) before checking logs of this scheduler.
 - Note that scheduler runs every 10 sec for demonstration purpose right now. change it with crontab express in future.
-[Banking service](/Banking%20APIs.postman_collection.json)
 
 ### Questions
 1)  Please outline the steps you would take to dockerize the application and the Dockerfile(s) you would use.
