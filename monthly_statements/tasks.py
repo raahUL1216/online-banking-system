@@ -1,23 +1,23 @@
-from .celery import app
+from monthly_statements.celery import app
 
-from database import get_db
-from models import User
-from statement import generate_monthly_statement
+from monthly_statements.database import get_db
+from monthly_statements.models import User
+from monthly_statements.statement import generate_monthly_statement
 
 from datetime import datetime, timedelta
 
-db = get_db()
-
-@app.task(bind=True, name="generate_monthly_statements")
+@app.task
 def generate_monthly_statements():
     '''
     Retrieve users and create monthly statement for each user
     '''
-    users = User.query.all()
+    gen_db = get_db()
+    db = next(gen_db)
+    users = db.query(User).all()
     
     today = datetime.now()
     previous_month = (today.replace(day=1) - timedelta(days=1)).strftime('%B')
     current_year = today.strftime('%Y')
 
     for user in users:
-        generate_monthly_statement(user.user_id, previous_month, current_year)
+        generate_monthly_statement(user.id, previous_month, current_year)

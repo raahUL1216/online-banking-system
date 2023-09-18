@@ -18,10 +18,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost",
-        "http://localhost:3000"
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
@@ -41,7 +38,6 @@ async def register(user_id: int, month: int, year: int, db: Session = Depends(ge
     '''
     Generate and save monthly statement for user
     '''
-    print('yoyoyo')
     user_id = int(user_id) or 0
     month = int(month) or 0
     year = int(year) or 0

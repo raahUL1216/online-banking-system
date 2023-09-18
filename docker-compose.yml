@@ -50,9 +50,9 @@ services:
 
     statement-worker:
         build: ./monthly_statements
-        command: celery -A celery worker -l debug
+        command: celery -A monthly_statements worker -l debug
         volumes:
-            - ./monthly_statements:/app
+            - ./:/app
         depends_on:
             - rabbitmqhost
             - postgreshost
@@ -65,12 +65,13 @@ services:
 
     statement-scheduler:
         build: ./monthly_statements
-        command: celery -A celery beat -l debug
+        command: celery -A monthly_statements beat -l debug
         volumes:
-            - ./monthly_statements:/app
+            - ./:/app
         depends_on:
             - rabbitmqhost
             - postgreshost
+            - statement-worker
         environment:
             - POSTGRES_USER=postgres
             - POSTGRES_PASSWORD=Welcome!

@@ -1,7 +1,7 @@
 from sqlalchemy import Column, BigInteger, String, DateTime
 from sqlalchemy.sql import func
 
-from database import Base, engine
+from monthly_statements.database import Base, engine
 
 class User(Base):
     __tablename__ = "users"
